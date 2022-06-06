@@ -19,6 +19,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 import time
 import argparse
 from datetime import datetime
+from datetime import datetime, timedelta
 
 
 # List that is filled with strings of viewing activity
@@ -35,6 +36,7 @@ chrome_options.add_argument('--disable-dev-shm-usage')
 driver = webdriver.Chrome(service=Service("/usr/lib/chromium-browser/chromedriver"), options=chrome_options) # uncomment this for pi
 
 USER = ""
+DAYS_WORTH_OF_HISTORY = None
 
 def get_active_profile():
     """
@@ -128,13 +130,29 @@ def hover_click():
             error_count += 1
 
 def scroll_to_bottom():
+    more_than_needed = False
+
     button = driver.find_elements_by_xpath('//button[text()="Show More"][contains(@class, "disabled")]')
     while not button:
         driver.find_element_by_xpath('//button[text()="Show More"]').click()
         time.sleep(2)
         button = driver.find_elements_by_xpath('//button[text()="Show More"][contains(@class, "disabled")]')
-    get_page_activity()
+        
+        if DAYS_WORTH_OF_HISTORY:
+            print("Checking you days worith of history..")
+            row_list = driver.find_elements_by_class_name('retableRow')
+            for row, i in zip(row_list, range(1, len(row_list))):
+                date_cell = row.find_elements_by_tag_name('div')[0]
+                datetime_object = datetime.strptime(date_cell.text, '%d/%m/%Y')
+                time_between = datetime.now() - datetime_object
+                if time_between.days>DAYS_WORTH_OF_HISTORY:
+                    more_than_needed = True
+                    break
 
+        if more_than_needed:
+            break
+    
+    get_page_activity()
 
 
 def get_page_activity():
@@ -239,10 +257,16 @@ def main(username, password):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('username', help='Netflix email address')
-    parser.add_argument('password', help='NEtflix password')
-    parser.add_argument('user', help='Profile user name')
+    parser.add_argument('--username', required=True, help='Netflix email address')
+    parser.add_argument('--password', required=True, help='Netflix password')
+    parser.add_argument('--user', required=True, help='Profile user name')
+    parser.add_argument('--history', required=False, type=int, help='How many days worth of history do you want?')
+    
     args = parser.parse_args()
 
     USER = args.user
+
+    if args.history:
+        DAYS_WORTH_OF_HISTORY = args.history
+
     main(args.username, args.password)
